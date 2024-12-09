@@ -1,27 +1,83 @@
-Version: "2012-10-17"
-Statement:
-  - Effect: Allow
-    Action:
-      - "s3:GetObject"
-      - "s3:ListBucket"
-    Resource:
-      - "arn:aws:s3:::example-bucket/*"
-      - "arn:aws:s3:::example-bucket"
-  - Effect: Allow
-    Action:
-      - "codebuild:*"
-    Resource: "arn:aws:codebuild:region:account-id:project/example-project"
-  - Effect: Allow
-    Action:
-      - "lambda:InvokeFunction"
-      - "lambda:GetFunction"
-    Resource: "arn:aws:lambda:region:account-id:function:example-function"
-  - Effect: Allow
-    Action:
-      - "iam:Get*"
-      - "iam:ListUsers"
-    Resource: "*"
-  - Effect: Allow
-    Action:
-      - "ec2:*"
-    Resource: "arn:aws:ec2:region:account-id:instance/*"
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+
+  # S3 Bucket with Public Read Access (Highly Insecure)
+  PublicS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  # IAM Role with Wildcard and Unrestricted Permissions
+  WildcardIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FullAdminAccess
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+
+  # EC2 Instance Role with Open Access to S3
+  EC2S3AccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: OpenS3Access
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: "arn:aws:s3:::*"
+
+  # DynamoDB Table with Public Access
+  PublicDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: PublicDynamoTable
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # Lambda Function with Full Permissions
+  InsecureLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt WildcardIAMRole.Arn
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': 'Insecure Lambda Execution'
+              }
+
+Outputs:
+  PublicBucketOutput:
+    Description: "Public S3 Bucket Name"
+    Value: !Ref PublicS3Bucket
