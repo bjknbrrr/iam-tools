@@ -35,7 +35,7 @@ jobs:
         with:
           scan-type: 'fs'
           scanners: 'vuln,secret,config'
-          scan-ref: './iam-policies-json/' # for CloudFormation templates
+          scan-ref: './clf-templates/' # for CloudFormation templates
           # scan-ref: './tf-templates/rhino_cloudgoat_lambda_privesc/terraform/' # for Terraform templates
           format: 'sarif'
           output: 'trivy-results.sarif'
